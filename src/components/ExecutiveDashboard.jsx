@@ -1,281 +1,459 @@
-import React from 'react';
-import { 
-  AlertTriangle, 
-  TrendingDown, 
-  PackageCheck, 
-  Clock, 
-  Building2, 
-  Filter, 
-  Truck, 
-  Flame, 
-  ArrowUpRight 
-} from 'lucide-react';
-import { STORES, CATEGORIES, FEFO_ALERTS, SUPPLIER_DISCREPANCIES, WASTE_INTENSITY, STOCK_VELOCITY } from '../data/inventoryData';
+import React, { useMemo } from 'react';
+import { ChevronDown, Inbox } from 'lucide-react';
+import {
+  CATEGORIES,
+  FEFO_ALERTS,
+  STOCK_VELOCITY,
+  STORES,
+  SUPPLIER_DISCREPANCIES,
+  WASTE_INTENSITY,
+} from '../data/inventoryData';
+import { Figure, Meter, Rule, Section, Tag } from './primitives';
+import {
+  PRESS, fmtDec, fmtInt, fmtPEN, fmtPct, severityByDays, severityOf,
+} from '../lib/ui';
 
-export default function ExecutiveDashboard({ selectedStore, setSelectedStore, selectedCategory, setSelectedCategory }) {
-  // Filter FEFO alerts based on store & category
-  const filteredFefo = FEFO_ALERTS.filter(item => {
-    const matchStore = selectedStore === 'ALL' || item.storeId === selectedStore;
-    const matchCat = selectedCategory === 'ALL' || item.categoryId === selectedCategory;
-    return matchStore && matchCat;
-  });
+/* ---------------------------------------------------------------------------
+   Filter control
+   ---------------------------------------------------------------------------
+   A native <select> keeps the mobile picker and the keyboard behaviour. Only
+   the chrome is restyled; the chevron is decorative and the border carries the
+   3:1 non-text contrast a form control needs.
+   --------------------------------------------------------------------------- */
+function Selector({ id, label, value, onChange, children }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor={id} className="label">{label}</label>
+      <div className="relative">
+        <select
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={`w-full appearance-none rounded-sm border border-rule-field bg-paper py-2 pl-3 pr-9 text-sm text-ink hover:bg-paper-2 ${PRESS}`}
+        >
+          {children}
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute right-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-3"
+          strokeWidth={1.5}
+          aria-hidden="true"
+        />
+      </div>
+    </div>
+  );
+}
 
-  // Calculate dynamic KPIs
-  const totalExposureCost = filteredFefo.reduce((sum, item) => sum + (item.daysLeft <= 5 ? item.exposureCost : 0), 0);
-  const criticalBatchesCount = filteredFefo.filter(item => item.daysLeft <= 2).length;
-  const highRiskDsiCount = STOCK_VELOCITY.filter(item => item.dsiDays <= 1.0).length;
+/* ---------------------------------------------------------------------------
+   Empty state
+   --------------------------------------------------------------------------- */
+function Empty({ title, hint }) {
+  return (
+    <div className="flex flex-col items-center gap-3 px-6 py-14 text-center">
+      <Inbox className="h-6 w-6 text-ink-3" strokeWidth={1.5} aria-hidden="true" />
+      <p className="font-display text-xl text-ink">{title}</p>
+      <p className="max-w-sm text-[0.8125rem] leading-relaxed text-ink-2">{hint}</p>
+    </div>
+  );
+}
+
+export default function ExecutiveDashboard({
+  selectedStore, setSelectedStore, selectedCategory, setSelectedCategory,
+}) {
+  const filteredFefo = useMemo(
+    () => FEFO_ALERTS.filter((item) => {
+      const matchStore = selectedStore === 'ALL' || item.storeId === selectedStore;
+      const matchCategory = selectedCategory === 'ALL' || item.categoryId === selectedCategory;
+      return matchStore && matchCategory;
+    }),
+    [selectedStore, selectedCategory],
+  );
+
+  const velocity = useMemo(
+    () => selectedStore === 'ALL'
+      ? STOCK_VELOCITY
+      : STOCK_VELOCITY.filter((row) => {
+          const store = STORES.find((s) => s.id === selectedStore);
+          return store ? row.storeCode === store.code : true;
+        }),
+    [selectedStore],
+  );
+
+  const waste = useMemo(
+    () => selectedStore === 'ALL'
+      ? WASTE_INTENSITY
+      : WASTE_INTENSITY.filter((row) => row.storeId === selectedStore),
+    [selectedStore],
+  );
+
+  const kpis = useMemo(() => {
+    const exposure = filteredFefo
+      .filter((item) => item.daysLeft <= 5)
+      .reduce((sum, item) => sum + item.exposureCost, 0);
+
+    const critical = filteredFefo.filter((item) => item.daysLeft <= 2).length;
+    const stockoutRisk = velocity.filter((row) => row.dsiDays <= 1).length;
+
+    const dispatched = SUPPLIER_DISCREPANCIES.reduce((s, r) => s + r.dispatchedQty, 0);
+    const accepted = SUPPLIER_DISCREPANCIES.reduce((s, r) => s + r.acceptedQty, 0);
+    const fillRate = dispatched > 0 ? (accepted / dispatched) * 100 : 0;
+    const shortValue = SUPPLIER_DISCREPANCIES.reduce((s, r) => s + r.lossAmountPEN, 0);
+
+    const worstWaste = waste.reduce(
+      (worst, row) => (!worst || row.wasteRatioPct > worst.wasteRatioPct ? row : worst),
+      null,
+    );
+
+    return { exposure, critical, stockoutRisk, fillRate, shortValue, worstWaste, dispatched, accepted };
+  }, [filteredFefo, velocity, waste]);
+
+  const maxWasteRatio = Math.max(1, ...WASTE_INTENSITY.map((r) => r.wasteRatioPct));
+  const storeLabel = STORES.find((s) => s.id === selectedStore)?.name ?? 'Consolidado';
 
   return (
-    <div className="space-y-6">
-      {/* Filter Toolbar */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center space-x-2 text-slate-300">
-          <Filter className="w-4 h-4 text-emerald-400" />
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">Filtros Operativos:</span>
+    <div className="space-y-14">
+      {/* ===================================================================
+          LEDE — the headline reading of the report
+          =================================================================== */}
+      <section>
+        <div className="enter enter-1 max-w-3xl">
+          <p className="label">Resumen ejecutivo</p>
+          <h2 className="mt-3 font-display text-head leading-[1.06] tracking-tight text-ink sm:text-head-lg">
+            Tres cuartos de la pérdida es{' '}
+            <span className="italic text-loss">vencimiento</span>, y el
+            vencimiento se previene rotando.
+          </h2>
+          <p className="mt-4 max-w-2xl text-[0.9375rem] leading-relaxed text-ink-2">
+            La merma por caducidad es la única categoría que una regla
+            determinista de rotación puede evitar de raíz. Esta vista prioriza
+            los lotes cuyo capital aún es recuperable con rebaja, no los que ya
+            se perdieron.
+          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Store Selector */}
-          <div className="flex items-center space-x-2">
-            <Building2 className="w-4 h-4 text-slate-400" />
-            <select
-              value={selectedStore}
-              onChange={(e) => setSelectedStore(e.target.value)}
-              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
-            >
-              {STORES.map(s => (
-                <option key={s.id} value={s.id}>
-                  {s.name} ({s.format})
-                </option>
-              ))}
-            </select>
+        {/* Headline figures, separated by hairlines rather than boxed in
+            identical cards. */}
+        <div className="enter enter-2 mt-10 grid grid-cols-1 gap-x-8 gap-y-8 border-t border-rule pt-8 sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-rule">
+          <div className="lg:pr-8">
+            <Figure
+              label={"Exposición ≤ 5 días"}
+              value={fmtPEN(kpis.exposure)}
+              severity={kpis.exposure > 0 ? 'danger' : 'healthy'}
+              note="Capital en lotes activos aún recuperable con rebaja dinámica."
+            />
           </div>
-
-          {/* Category Selector */}
-          <div className="flex items-center space-x-2">
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-emerald-500"
-            >
-              {CATEGORIES.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+          <div className="lg:px-8">
+            <Figure
+              label={"Lotes críticos ≤ 48 h"}
+              value={fmtInt(kpis.critical)}
+              unit="lotes"
+              severity={kpis.critical > 0 ? 'danger' : 'healthy'}
+              note="Prioridad 1 en góndola según la regla FEFO."
+            />
+          </div>
+          <div className="lg:px-8">
+            <Figure
+              label="SKU en riesgo de quiebre"
+              value={fmtInt(kpis.stockoutRisk)}
+              unit="SKU"
+              severity={kpis.stockoutRisk > 0 ? 'warning' : 'healthy'}
+              note="Días de inventario ≤ 1,0: reposición urgente."
+            />
+          </div>
+          <div className="lg:pl-8">
+            <Figure
+              label="Fill rate proveedores"
+              value={fmtPct(kpis.fillRate)}
+              severity={kpis.fillRate >= 95 ? 'healthy' : 'warning'}
+              note={`${fmtPEN(kpis.shortValue)} no recibidos pero facturables.`}
+            />
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Top 4 KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* KPI 1: Exposición Financiera */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Exposición Vencimiento FEFO</span>
-            <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-bold text-slate-100 font-mono">S/ {totalExposureCost.toFixed(2)}</span>
-            <span className="text-xs text-rose-400 font-medium font-mono">&lt;= 5 días</span>
-          </div>
-          <p className="mt-1 text-xs text-slate-400">Riesgo monetario mitigable con rebaja dinámica.</p>
-        </div>
+      {/* ===================================================================
+          FILTERS
+          =================================================================== */}
+      <section className="enter enter-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <Selector id="filter-store" label="Sede" value={selectedStore} onChange={setSelectedStore}>
+            {STORES.map((store) => (
+              <option key={store.id} value={store.id}>{store.name}</option>
+            ))}
+          </Selector>
 
-        {/* KPI 2: Lotes en Alerta Roja */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Lotes Críticos (&lt;= 48h)</span>
-            <div className="p-2 rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              <Clock className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-bold text-slate-100 font-mono">{criticalBatchesCount}</span>
-            <span className="text-xs text-amber-400 font-medium">Acción Inmediata</span>
-          </div>
-          <p className="mt-1 text-xs text-slate-400">Prioridad 1 en góndola según regla FEFO.</p>
-        </div>
+          <Selector id="filter-category" label="Categoría" value={selectedCategory} onChange={setSelectedCategory}>
+            {CATEGORIES.map((category) => (
+              <option key={category.id} value={category.id}>{category.name}</option>
+            ))}
+          </Selector>
 
-        {/* KPI 3: Riesgo de Quiebre (DSI) */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">SKUs con DSI Crítico</span>
-            <div className="p-2 rounded-lg bg-sky-500/10 text-sky-400 border border-sky-500/20">
-              <TrendingDown className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-bold text-slate-100 font-mono">{highRiskDsiCount}</span>
-            <span className="text-xs text-sky-400 font-medium">Stockout Warning</span>
-          </div>
-          <p className="mt-1 text-xs text-slate-400">Días de inventario &lt;= 1.0 (reorden urgente).</p>
-        </div>
-
-        {/* KPI 4: Auditoría de Recepciones */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-4 relative overflow-hidden">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400">Fill-Rate Promedio Proveedores</span>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <PackageCheck className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-2xl font-bold text-slate-100 font-mono">95.0%</span>
-            <span className="text-xs text-emerald-400 font-medium">Auditado GRN</span>
-          </div>
-          <p className="mt-1 text-xs text-slate-400">Discrepancias bloqueadas antes de pago.</p>
-        </div>
-      </div>
-
-      {/* Main Grid: FEFO Alert Table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-lg">
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-slate-100 flex items-center space-x-2">
-              <Flame className="w-4 h-4 text-rose-400" />
-              <span>Matriz Operativa FEFO: Exposición y Alertas de Rotación</span>
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Consultas SQL analíticas ejecutadas sobre lotes activos de PostgreSQL (Query 1).
+          <div className="hidden items-end lg:col-span-2 lg:flex">
+            <p className="pb-2 font-mono text-[0.6875rem] leading-relaxed text-ink-3">
+              Ámbito activo: {storeLabel} ·{' '}
+              {filteredFefo.length === 1 ? '1 lote' : `${filteredFefo.length} lotes`} en matriz FEFO
             </p>
           </div>
-          <span className="text-xs font-mono px-2.5 py-1 rounded bg-slate-800 text-slate-300 border border-slate-700">
-            {filteredFefo.length} lotes encontrados
-          </span>
         </div>
+      </section>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950/60 text-slate-400 border-b border-slate-800 font-mono uppercase text-[11px]">
-              <tr>
-                <th className="py-3 px-4">Sede / Tienda</th>
-                <th className="py-3 px-4">Producto & Lote</th>
-                <th className="py-3 px-4">Stock Actual</th>
-                <th className="py-3 px-4">Vence en</th>
-                <th className="py-3 px-4">Costo en Riesgo</th>
-                <th className="py-3 px-4">Plan de Acción Recomendado</th>
-                <th className="py-3 px-4 text-center">Prioridad FEFO</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60 font-sans">
-              {filteredFefo.map((item, idx) => (
-                <tr key={idx} className="hover:bg-slate-800/40 transition-colors">
-                  <td className="py-3 px-4">
-                    <div className="font-medium text-slate-200">{item.storeName}</div>
-                    <div className="text-[11px] text-slate-400 font-mono">{item.storeCode}</div>
-                  </td>
-                  <td className="py-3 px-4">
-                    <div className="font-medium text-slate-100">{item.productName}</div>
-                    <div className="text-[11px] text-slate-400 font-mono">{item.batchCode} · {item.categoryName}</div>
-                  </td>
-                  <td className="py-3 px-4 font-mono font-medium text-slate-200">
-                    {item.currentQty} und.
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-mono font-semibold ${
-                      item.daysLeft <= 1 ? 'bg-rose-950 text-rose-400 border border-rose-800' :
-                      item.daysLeft <= 3 ? 'bg-amber-950 text-amber-400 border border-amber-800' :
-                      'bg-emerald-950 text-emerald-400 border border-emerald-800'
-                    }`}>
-                      {item.daysLeft} días
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 font-mono text-slate-200">
-                    S/ {item.exposureCost.toFixed(2)}
-                  </td>
-                  <td className="py-3 px-4">
-                    <span className="text-[11px] text-slate-300 font-medium">
-                      {item.actionPlan}
-                    </span>
-                  </td>
-                  <td className="py-3 px-4 text-center font-mono font-bold text-slate-200">
-                    #{item.rotationRank}
-                  </td>
+      {/* ===================================================================
+          FEFO MATRIX
+          =================================================================== */}
+      <Section
+        className="enter enter-4"
+        number="01"
+        title="Matriz de rotación FEFO"
+        lede="Lotes activos ordenados por cercanía de vencimiento. El rango de prioridad proviene de un DENSE_RANK por sede y categoría."
+        meta={<Tag>Query 1</Tag>}
+      >
+        {filteredFefo.length === 0 ? (
+          <Empty
+            title="Sin lotes en el ámbito seleccionado"
+            hint="Ninguna combinación de sede y categoría coincide. Amplía el filtro para ver los lotes activos."
+          />
+        ) : (
+          <div className="scroll-x -mx-5 px-5 sm:mx-0 sm:px-0">
+            <table className="w-full min-w-[56rem] border-collapse text-left">
+              <caption className="sr-only">
+                Lotes activos con riesgo de vencimiento, costo expuesto y acción recomendada
+              </caption>
+              <thead>
+                <tr className="border-b border-rule">
+                  <th scope="col" className="label pb-2.5 pl-3 pr-4 font-normal">Sede</th>
+                  <th scope="col" className="label pb-2.5 pr-4 font-normal">Producto y lote</th>
+                  <th scope="col" className="label pb-2.5 pr-4 text-right font-normal">Stock</th>
+                  <th scope="col" className="label pb-2.5 pr-4 text-right font-normal">Vence</th>
+                  <th scope="col" className="label whitespace-nowrap pb-2.5 pr-6 text-right font-normal">Costo expuesto</th>
+                  <th scope="col" className="label pb-2.5 pr-4 font-normal">Acción del motor</th>
+                  <th scope="col" className="label pb-2.5 pr-3 text-right font-normal">Rango</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+              </thead>
+              <tbody>
+                {filteredFefo.map((item) => {
+                  const level = severityByDays(item.daysLeft);
+                  const tone = severityOf(level);
+                  // The action string is a machine-emitted code; show the
+                  // detail after the colon and keep the severity as the Tag.
+                  const detail = item.actionPlan.includes(':')
+                    ? item.actionPlan.split(':').slice(1).join(':').trim()
+                    : item.actionPlan;
 
-      {/* Two Column Section: DSI Stockout Velocity & Supplier Discrepancies */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: DSI Velocity & Reorder Alerts */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-5">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-100 flex items-center space-x-2">
-                <TrendingDown className="w-4 h-4 text-sky-400" />
-                <span>Velocidad de Ventas & Días de Inventario (DSI)</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">Detección de sobrestock y riesgo de quiebre (Query 4).</p>
-            </div>
-          </div>
+                  return (
+                    <tr
+                      key={`${item.storeCode}-${item.batchCode}`}
+                      className="group border-b border-rule-soft transition-[background-color] duration-150 ease-out hover:bg-paper-2"
+                    >
+                      {/* A 2px severity bar on the row edge: the status is
+                          legible before reading a single word. */}
+                      <td className="relative py-3.5 pl-3 align-top">
+                        <span
+                          aria-hidden="true"
+                          className={`absolute inset-y-2 left-0 w-0.5 rounded-xs ${tone.bg}`}
+                        />
+                        <span className="block text-sm text-ink">{item.storeName}</span>
+                        <span className="mt-0.5 block font-mono text-[0.6875rem] text-ink-3">
+                          {item.storeCode}
+                        </span>
+                      </td>
 
-          <div className="mt-4 space-y-3">
-            {STOCK_VELOCITY.map((stock, i) => (
-              <div key={i} className="p-3 bg-slate-950/70 rounded-lg border border-slate-800/80 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-semibold text-slate-200">{stock.name}</div>
-                  <div className="text-[11px] text-slate-400 font-mono">
-                    Stock: {stock.stockOnHand} und. | Rotación: {stock.dailyVelocity}/día
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs font-mono font-bold text-slate-200">
-                    {stock.dsiDays} días DSI
-                  </div>
-                  <span className={`text-[10px] font-semibold uppercase ${
-                    stock.severity === 'danger' ? 'text-rose-400' :
-                    stock.severity === 'warning' ? 'text-amber-400' : 'text-emerald-400'
-                  }`}>
-                    {stock.healthStatus.split(':')[0]}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+                      <td className="py-3.5 pr-4 align-top">
+                        <span className="block text-sm text-ink">{item.productName}</span>
+                        <span className="mt-0.5 block font-mono text-[0.6875rem] text-ink-3">
+                          {item.batchCode} · {item.categoryName}
+                        </span>
+                      </td>
 
-        {/* Right: Supplier Discrepancies Audit */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden p-5">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div>
-              <h3 className="text-sm font-semibold text-slate-100 flex items-center space-x-2">
-                <Truck className="w-4 h-4 text-emerald-400" />
-                <span>Auditoría de Recepciones vs Guías de Despacho (GRN)</span>
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">Control de mermas de origen y sobrepago a proveedores (Query 2).</p>
-            </div>
-          </div>
+                      <td className="py-3.5 pr-4 text-right align-top font-mono text-sm text-ink">
+                        {fmtInt(item.currentQty)}
+                        <span className="ml-1 text-ink-3">und</span>
+                      </td>
 
-          <div className="mt-4 space-y-3">
-            {SUPPLIER_DISCREPANCIES.map((sup, idx) => (
-              <div key={idx} className="p-3 bg-slate-950/70 rounded-lg border border-slate-800/80 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-semibold text-slate-200">{sup.supplier}</div>
-                  <div className="text-[11px] text-slate-400 font-mono">
-                    RUC: {sup.ruc} · Despachadas: {sup.dispatchedQty} | Conformes: {sup.acceptedQty}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-xs font-mono font-bold text-slate-200">
-                    {sup.fillRatePct.toFixed(1)}% Fill Rate
-                  </div>
-                  <div className={`text-[10px] font-semibold ${
-                    sup.discrepancyQty > 0 ? 'text-rose-400' : 'text-emerald-400'
-                  }`}>
-                    {sup.discrepancyQty > 0 ? `-${sup.discrepancyQty} und. dañadas (S/ ${sup.lossAmountPEN.toFixed(2)})` : 'Sin discrepancias'}
-                  </div>
-                </div>
-              </div>
-            ))}
+                      <td className="py-3.5 pr-4 text-right align-top">
+                        <span className={`whitespace-nowrap font-mono text-sm font-medium ${tone.ink}`}>
+                          {item.daysLeft === 1 ? '1 día' : `${item.daysLeft} días`}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 pr-4 text-right align-top font-mono text-sm text-ink">
+                        {fmtPEN(item.exposureCost)}
+                      </td>
+
+                      <td className="max-w-[18rem] py-3.5 pr-4 align-top">
+                        <Tag severity={level}>{tone.label}</Tag>
+                        <span className="mt-1 block font-mono text-[0.6875rem] leading-snug text-ink-3">
+                          {detail}
+                        </span>
+                      </td>
+
+                      <td className="py-3.5 pr-3 text-right align-top font-mono text-sm text-ink-2">
+                        {item.rotationRank}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
+        )}
+      </Section>
+
+      {/* ===================================================================
+          WASTE INTENSITY
+          =================================================================== */}
+      <Section
+        number="02"
+        title="Intensidad de merma por sede"
+        lede="Pérdida monetaria como porcentaje de la venta bruta. La dispersión entre sedes es lo accionable: señala formato y tamaño de pedido, no disciplina del personal."
+        meta={<Tag>Query 3</Tag>}
+      >
+        {waste.length === 0 ? (
+          <Empty
+            title="Sin registros de merma"
+            hint="La sede seleccionada no tiene mermas registradas en el periodo."
+          />
+        ) : (
+          <div className="grid grid-cols-1 gap-x-12 gap-y-7 lg:grid-cols-2">
+            {waste.map((row) => {
+              const level = row.wasteRatioPct >= 5 ? 'danger'
+                : row.wasteRatioPct >= 3 ? 'warning' : 'healthy';
+              const tone = severityOf(level);
+              return (
+                <div key={`${row.storeCode}-${row.categoryName}`}>
+                  <div className="flex items-baseline justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm text-ink">{row.storeName}</p>
+                      <p className="mt-0.5 font-mono text-[0.6875rem] text-ink-3">
+                        {row.storeCode} · {row.categoryName}
+                      </p>
+                    </div>
+                    <p className={`font-display text-fig-sm ${tone.ink}`}>
+                      {fmtPct(row.wasteRatioPct, 2)}
+                    </p>
+                  </div>
+                  <Meter
+                    value={row.wasteRatioPct}
+                    max={maxWasteRatio}
+                    severity={level}
+                    className="mt-3"
+                  />
+                  <p className="mt-2 font-mono text-[0.6875rem] text-ink-3">
+                    Merma {fmtPEN(row.wasteAmountPEN)} sobre venta {fmtPEN(row.grossSalesPEN)}
+                    {' · '}
+                    {fmtPct(row.wasteContributionPct, 0)} de la pérdida de la sede
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Section>
+
+      {/* ===================================================================
+          VELOCITY + SUPPLIERS
+          =================================================================== */}
+      <div className="grid grid-cols-1 gap-14 lg:grid-cols-2 lg:gap-12">
+        <Section
+          number="03"
+          title="Velocidad y días de inventario"
+          lede="Stock actual contra la media móvil de venta diaria. Detecta sobrestock perecible y quiebre inminente."
+          meta={<Tag>Query 4</Tag>}
+        >
+          {velocity.length === 0 ? (
+            <Empty title="Sin SKU en el ámbito" hint="La sede seleccionada no tiene SKU con historial de rotación." />
+          ) : (
+            <ul className="space-y-0">
+              {velocity.map((row, index) => {
+                const tone = severityOf(row.severity);
+                const headline = row.healthStatus.split(':')[0].trim();
+                const detail = row.healthStatus.includes(':')
+                  ? row.healthStatus.split(':').slice(1).join(':').trim()
+                  : null;
+                return (
+                  <li key={`${row.sku}-${row.storeCode}`}>
+                    {index > 0 ? <Rule soft /> : null}
+                    <div className="flex items-start justify-between gap-5 py-4">
+                      <div className="min-w-0">
+                        <p className="text-sm text-ink">{row.name}</p>
+                        <p className="mt-0.5 font-mono text-[0.6875rem] text-ink-3">
+                          {row.sku} · {row.storeCode} · stock {fmtInt(row.stockOnHand)} und
+                          {' · '}rotación {fmtDec(row.dailyVelocity)}/día
+                        </p>
+                        <p className={`mt-1.5 font-mono text-[0.6875rem] uppercase tracking-wider ${tone.ink}`}>
+                          {headline}
+                        </p>
+                        {detail ? (
+                          <p className="mt-0.5 text-[0.75rem] leading-snug text-ink-2">{detail}</p>
+                        ) : null}
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className={`font-display text-fig-sm ${tone.ink}`}>{fmtDec(row.dsiDays)}</p>
+                        <p className="label mt-0.5">días DSI</p>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Section>
+
+        <Section
+          number="04"
+          title="Recepciones contra guía de despacho"
+          lede="Diferencia entre lo despachado por el proveedor y el conteo físico en tienda. Sostiene la nota de crédito antes del pago."
+          meta={<Tag>Query 2</Tag>}
+        >
+          <ul className="space-y-0">
+            {SUPPLIER_DISCREPANCIES.map((supplier, index) => {
+              const hasGap = supplier.discrepancyQty > 0;
+              const level = hasGap ? 'danger' : 'healthy';
+              const tone = severityOf(level);
+              return (
+                <li key={supplier.ruc}>
+                  {index > 0 ? <Rule soft /> : null}
+                  <div className="py-4">
+                    <div className="flex items-baseline justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-ink">{supplier.supplier}</p>
+                        <p className="mt-0.5 font-mono text-[0.6875rem] text-ink-3">
+                          RUC {supplier.ruc} · despachado {fmtInt(supplier.dispatchedQty)}
+                          {' · '}conforme {fmtInt(supplier.acceptedQty)}
+                        </p>
+                      </div>
+                      <p className={`font-display text-fig-sm ${tone.ink}`}>
+                        {fmtPct(supplier.fillRatePct, 1)}
+                      </p>
+                    </div>
+                    <Meter
+                      value={supplier.fillRatePct}
+                      severity={level}
+                      className="mt-3"
+                    />
+                    <p className="mt-2 text-[0.75rem] text-ink-2">
+                      {hasGap ? (
+                        <>
+                          <span className={tone.ink}>
+                            −{fmtInt(supplier.discrepancyQty)} und ·{' '}
+                            {fmtPEN(supplier.lossAmountPEN)}
+                          </span>{' '}
+                          reclamables
+                        </>
+                      ) : (
+                        'Recepción conforme, sin diferencia que reclamar.'
+                      )}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+
+          <Rule className="mt-2" />
+          <p className="mt-4 font-mono text-[0.6875rem] leading-relaxed text-ink-3">
+            Total red: {fmtInt(kpis.accepted)} de {fmtInt(kpis.dispatched)} und conformes
+            {' · '}fill rate {fmtPct(kpis.fillRate)}
+          </p>
+        </Section>
       </div>
     </div>
   );

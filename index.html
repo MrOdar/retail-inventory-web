@@ -2,15 +2,40 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2310b981' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><ellipse cx='12' cy='5' rx='9' ry='3'></ellipse><path d='M3 5V19A9 3 0 0 0 21 19V5'></path><path d='M3 12A9 3 0 0 0 21 12'></path></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RetailOps 3NF · Retail Inventory Analytics & SQL Engine</title>
-    <meta name="description" content="Dashboard de analítica retail, mitigación de mermas FEFO y consultas avanzadas PostgreSQL en Tercera Forma Normal (3NF). Por Odar Javier Alcocer Vásquez." />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <title>RetailOps 3NF · Analítica de Inventario Perecible y Mermas</title>
+    <meta name="description" content="Informe operativo de rotación FEFO, exposición financiera por vencimiento y auditoría de recepciones, sobre un modelo relacional PostgreSQL en Tercera Forma Normal. Por Odar Javier Alcocer Vásquez." />
+    <meta name="author" content="Odar Javier Alcocer Vásquez" />
+    <meta name="theme-color" content="#f8f7f4" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1c1b19" media="(prefers-color-scheme: dark)" />
+
+    <!-- Monogram mark: the project initial set in the display serif, on ink. -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231c1b19'/><path d='M7 24V8h5.6c3.4 0 5.6 1.9 5.6 5 0 2.3-1.2 3.9-3.3 4.6L24 24h-4.3l-4.2-5.6h-2.6V24H7zm3.9-8.6h1.7c1.4 0 2.2-.8 2.2-2.1s-.8-2-2.2-2h-1.7v4.1z' fill='%23f8f7f4'/><circle cx='25' cy='9' r='3' fill='%23c0441c'/></svg>" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+    <script>
+      // Resolve the theme before first paint so the page never flashes the
+      // wrong background. Runs inline and synchronously, on purpose.
+      (function () {
+        try {
+          var stored = localStorage.getItem('retailops-theme');
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.dataset.theme =
+            stored === 'light' || stored === 'dark'
+              ? stored
+              : (prefersDark ? 'dark' : 'light');
+        } catch (e) {
+          // Private mode or blocked storage: fall back to light.
+          document.documentElement.dataset.theme = 'light';
+        }
+      })();
+    </script>
   </head>
-  <body class="bg-[#0b1120] text-slate-100">
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

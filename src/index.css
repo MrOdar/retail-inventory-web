@@ -2,14 +2,246 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ===========================================================================
+   DESIGN TOKENS
+   ---------------------------------------------------------------------------
+   Paper-and-ink editorial palette. Two neutrals (warm bone paper, warm ink)
+   and exactly three signal hues: oxide vermilion for loss, burnt amber for
+   caution, petrol for healthy. Deliberately avoids the slate/emerald default.
+   All colors in OKLCH so the dark theme keeps perceptual lightness steps.
+   =========================================================================== */
+
 :root {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  /* Surfaces */
+  --paper:      oklch(0.985 0.004 85);
+  --paper-2:    oklch(0.962 0.006 85);
+  --paper-3:    oklch(0.934 0.008 85);
+
+  /* Ink */
+  --ink:        oklch(0.215 0.012 60);
+  --ink-2:      oklch(0.455 0.010 60);
+  --ink-3:      oklch(0.530 0.009 60);
+
+  /* Structure: hairline rules and dividers */
+  --rule:       oklch(0.215 0.012 60 / 0.14);
+  --rule-soft:  oklch(0.215 0.012 60 / 0.07);
+  --field-line: oklch(0.560 0.010 60);
+
+  /* Signals */
+  --loss:       oklch(0.505 0.185 31);
+  --loss-soft:  oklch(0.505 0.185 31 / 0.10);
+  --loss-line:  oklch(0.505 0.185 31 / 0.30);
+  --caution:    oklch(0.510 0.108 62);
+  --caution-soft: oklch(0.565 0.115 67 / 0.10);
+  --caution-line: oklch(0.565 0.115 67 / 0.30);
+  --healthy:    oklch(0.455 0.062 196);
+  --healthy-soft: oklch(0.455 0.062 196 / 0.10);
+  --healthy-line: oklch(0.455 0.062 196 / 0.30);
+
+  /* Accent used for interactive ink (links, focus) */
+  --accent:     oklch(0.455 0.062 196);
+
+  /* Radii. Kept small: a printed report has crisp corners, not pills. */
+  --r-xs: 2px;
+  --r-sm: 4px;
+  --r-md: 7px;
+  --r-lg: 11px;
+
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --paper:      oklch(0.168 0.009 62);
+  --paper-2:    oklch(0.213 0.011 62);
+  --paper-3:    oklch(0.262 0.012 62);
+
+  --ink:        oklch(0.952 0.005 85);
+  --ink-2:      oklch(0.742 0.008 85);
+  --ink-3:      oklch(0.645 0.008 85);
+
+  --rule:       oklch(0.952 0.005 85 / 0.16);
+  --rule-soft:  oklch(0.952 0.005 85 / 0.08);
+  --field-line: oklch(0.620 0.009 85);
+
+  --loss:       oklch(0.680 0.165 33);
+  --loss-soft:  oklch(0.680 0.165 33 / 0.14);
+  --loss-line:  oklch(0.680 0.165 33 / 0.36);
+  --caution:    oklch(0.755 0.120 70);
+  --caution-soft: oklch(0.755 0.120 70 / 0.14);
+  --caution-line: oklch(0.755 0.120 70 / 0.36);
+  --healthy:    oklch(0.715 0.075 197);
+  --healthy-soft: oklch(0.715 0.075 197 / 0.14);
+  --healthy-line: oklch(0.715 0.075 197 / 0.36);
+
+  --accent:     oklch(0.715 0.075 197);
+
   color-scheme: dark;
+}
+
+/* ===========================================================================
+   BASE
+   =========================================================================== */
+
+html {
+  /* The masthead is sticky; keep anchored scrolling clear of it. */
+  scroll-padding-top: 5rem;
 }
 
 body {
   margin: 0;
-  background-color: #0b1120;
-  color: #f1f5f9;
   min-height: 100vh;
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: 'Inter Tight', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv05' 1, 'ss03' 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Every figure in the UI is compared against the figure above it, so all
+   numerals are tabular by default. Proportional numerals in a data column
+   make the decimal points wander. */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background-color: var(--loss-soft);
+  color: var(--ink);
+}
+
+/* Interactive controls draw their own pressed state, so the mobile browser's
+   gray tap flash would double it. */
+button, a, select, [role="tab"] {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ===========================================================================
+   TYPOGRAPHY UTILITIES
+   =========================================================================== */
+
+.font-display {
+  font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  letter-spacing: -0.012em;
+}
+
+.font-mono {
+  font-family: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Menlo, monospace;
+}
+
+/* Small-caps machine label: column heads, field names, metadata keys. */
+.label {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.2;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+/* ===========================================================================
+   FOCUS
+   ---------------------------------------------------------------------------
+   One visible ring for every focusable thing, offset so it never collides
+   with the element's own border.
+   =========================================================================== */
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
+
+/* ===========================================================================
+   MOTION
+   ---------------------------------------------------------------------------
+   Keyframes are used ONLY for one-shot entrance sequences, which never need
+   to reverse mid-flight. Every interactive state change is a transition on a
+   named property, declared at the call site.
+   Hidden state lives in the `from` keyframe with `animation-fill-mode: both`,
+   never in a base rule, so content stays visible if animation never runs.
+   =========================================================================== */
+
+@keyframes enter-up {
+  from { opacity: 0; filter: blur(4px); transform: translateY(12px); }
+  to   { opacity: 1; filter: blur(0);   transform: translateY(0); }
+}
+
+@keyframes enter-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Staged entrance. Chunks are staggered 100ms apart to communicate
+   hierarchy: title, then lede, then figures, then the data itself. */
+.enter {
+  animation: enter-fade 300ms ease-out both;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .enter {
+    animation-name: enter-up;
+  }
+}
+
+.enter-1 { animation-delay: 0ms; }
+.enter-2 { animation-delay: 100ms; }
+.enter-3 { animation-delay: 200ms; }
+.enter-4 { animation-delay: 300ms; }
+.enter-5 { animation-delay: 400ms; }
+
+/* Theme-switch smear guard: every transition is killed for one frame while
+   the token values swap, then restored. Without this, each color transition
+   on the page fires at once and the switch looks like a wipe. */
+.theme-sync * ,
+.theme-sync *::before,
+.theme-sync *::after {
+  transition: none !important;
+  animation-duration: 0ms !important;
+}
+
+/* ===========================================================================
+   SCROLL CONTAINERS
+   ---------------------------------------------------------------------------
+   Scrolling past the end of an inner panel must not scroll the page behind it.
+   =========================================================================== */
+
+/* Containment is per-axis on purpose. `overscroll-behavior: contain` on a
+   horizontal-only scroller also blocks VERTICAL scroll chaining, so the page
+   stops scrolling while the pointer sits over a wide table. Each scroller
+   contains only the axis it actually owns. */
+.scroll-x {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+}
+
+.scroll-y {
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+/* Thin, ink-toned scrollbars so the code panel does not get a chrome-blue
+   bar fighting the palette. */
+.scroll-x, .scroll-y {
+  scrollbar-width: thin;
+  scrollbar-color: var(--rule) transparent;
+}
+
+.scroll-x::-webkit-scrollbar,
+.scroll-y::-webkit-scrollbar { height: 8px; width: 8px; }
+
+.scroll-x::-webkit-scrollbar-thumb,
+.scroll-y::-webkit-scrollbar-thumb {
+  background: var(--rule);
+  border-radius: 99px;
+}
+
+/* ===========================================================================
+   NATIVE CONTROL RESET
+   =========================================================================== */
+
+select {
+  appearance: none;
+  background-image: none;
 }
