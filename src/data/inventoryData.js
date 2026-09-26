@@ -439,6 +439,13 @@ export const SCHEMA_TABLES = [
     columns: ['product_id (PK)', 'sku_code (UK)', 'barcode_ean13', 'product_name', 'category_id (FK)', 'unit_cost', 'retail_price', 'min_safety_stock', 'reorder_point', 'shelf_life_days', 'is_perishable']
   },
   {
+    name: 'waste_reasons',
+    type: 'Classification / Audit',
+    pk: 'waste_reason_id',
+    columns: ['waste_reason_id (PK)', 'reason_code (UK)', 'reason_description', 'loss_classification']
+  },
+
+  {
     name: 'goods_receipt_headers',
     type: 'Transaction / Ingestion',
     pk: 'grn_id',
