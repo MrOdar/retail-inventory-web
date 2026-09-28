@@ -125,7 +125,7 @@ export default function DataArchitecture() {
           <p className="label">Modelo relacional</p>
           <h2 className="mt-3 font-display text-head leading-[1.06] tracking-tight text-ink sm:text-head-lg">
             Tercera forma normal, para que la anomalía sea{' '}
-            <span className="italic text-ink-2">imposible</span> y no sólo
+            <span className="text-ink font-semibold">imposible</span> y no sólo
             improbable.
           </h2>
           <p className="mt-4 max-w-2xl text-[0.9375rem] leading-relaxed text-ink-2">

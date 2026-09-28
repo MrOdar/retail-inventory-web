@@ -59,8 +59,8 @@ export default function Masthead({ activeTab, setActiveTab, theme, onToggleTheme
         <div className="flex flex-col gap-6 pt-8 pb-6 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="label">Odar Javier Alcocer Vásquez · UPC</p>
-            <h1 className="mt-2 font-display text-[2rem] sm:text-[2.6rem] leading-[1.04] tracking-tight text-ink">
-              RetailOps&nbsp;<span className="italic text-ink-2">3NF</span>
+            <h1 className="mt-2 font-display text-[2rem] sm:text-[2.6rem] leading-[1.04] tracking-tight text-ink font-bold">
+              RetailOps&nbsp;<span className="text-ink-2 font-mono text-[1.8rem] sm:text-[2.2rem]">3NF</span>
             </h1>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-2">
               Informe operativo de rotación FEFO, exposición financiera por

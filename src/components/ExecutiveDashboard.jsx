@@ -119,7 +119,7 @@ export default function ExecutiveDashboard({
           <p className="label">Resumen ejecutivo</p>
           <h2 className="mt-3 font-display text-head leading-[1.06] tracking-tight text-ink sm:text-head-lg">
             Tres cuartos de la pérdida es{' '}
-            <span className="italic text-loss">vencimiento</span>, y el
+            <span className="text-loss font-semibold">vencimiento</span>, y el
             vencimiento se previene rotando.
           </h2>
           <p className="mt-4 max-w-2xl text-[0.9375rem] leading-relaxed text-ink-2">

@@ -9,8 +9,6 @@ export default {
   ],
   theme: {
     extend: {
-      // Every color resolves to a CSS custom property, so the dark theme is a
-      // single `data-theme` swap on <html> with no duplicated utility classes.
       colors: {
         paper: {
           DEFAULT: 'var(--paper)',
@@ -51,31 +49,31 @@ export default {
         lg: 'var(--r-lg)',
       },
       fontFamily: {
-        sans: ["'Inter Tight'", 'system-ui', '-apple-system', 'sans-serif'],
-        display: ["'Instrument Serif'", 'Georgia', 'serif'],
-        mono: ["'IBM Plex Mono'", 'ui-monospace', 'Menlo', 'monospace'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+        display: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', '"SF Mono"', 'Menlo', 'Consolas', '"Liberation Mono"', 'monospace'],
       },
       fontSize: {
-        // Editorial display sizes for headline figures.
-        'fig-sm': ['1.75rem', { lineHeight: '1.05' }],
-        'fig':    ['2.5rem',  { lineHeight: '1.0' }],
-        'fig-lg': ['3.5rem',  { lineHeight: '0.96' }],
-        'head':   ['2.75rem', { lineHeight: '1.06' }],
-        'head-lg':['4rem',    { lineHeight: '1.02' }],
+        'fig-sm': ['1.6rem', { lineHeight: '1.05', fontWeight: '600' }],
+        'fig':    ['2.25rem',  { lineHeight: '1.0', fontWeight: '700' }],
+        'fig-lg': ['3.25rem',  { lineHeight: '0.96', fontWeight: '700' }],
+        'head':   ['2.25rem', { lineHeight: '1.1', fontWeight: '700' }],
+        'head-lg':['3.25rem', { lineHeight: '1.05', fontWeight: '700' }],
       },
-      transitionTimingFunction: {
-        // The emphasised curve used for icon cross-fades.
-        emphasis: 'cubic-bezier(0.2, 0, 0, 1)',
+      animation: {
+        'fade-in': 'fadeIn 0.2s ease-out forwards',
+      },
+      keyframes: {
+        fadeIn: {
+          from: { opacity: '0', transform: 'translateY(4px)' },
+          to:   { opacity: '1', transform: 'translateY(0)' },
+        },
       },
     },
   },
   plugins: [
-    // Tailwind 3's `hover:` variant compiles to a bare `:hover`, which latches
-    // after a tap on touch devices and reads as a stuck selected state.
-    // Tailwind 4 gates it behind this query by default; this backports it.
-    plugin(function hoverOnlyOnCapablePointers({ addVariant }) {
+    plugin(function ({ addVariant }) {
       addVariant('hover', '@media (hover: hover) { &:hover }');
-      addVariant('group-hover', '@media (hover: hover) { :merge(.group):hover & }');
     }),
   ],
-}
+};
